@@ -1,8 +1,9 @@
 #!/usr/bin/python
+import asyncio
+from logging import critical, debug, error, info, warning
+
 import PIL.Image
 import pygame
-import asyncio
-from logging import debug, info, warning, error, critical
 
 # inspired by
 # https://github.com/AlexElvers/pygame-with-asyncio/blob/master/main.py

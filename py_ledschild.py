@@ -6,14 +6,28 @@ from logging import critical, debug, error, info, warning
 from pathlib import Path
 
 import aiohttp
+import PIL.BdfFontFile
 import PIL.Image
 import PIL.ImageDraw
 import PIL.ImageFont
-import PIL.BdfFontFile
 import pygame
 import pygame.locals
 
 import hw_pygame  # dummy hw
+
+
+class LED_Schild:
+    def __init__(self, width, height, hw):
+        self.width = width
+        self.height = height
+        self.hw = hw
+
+        self.src_images = list()
+        self.src_image_ix = None
+        self.offset_x = 0
+
+    def tick(self):
+        pass
 
 
 def handle_http(req):
@@ -21,20 +35,16 @@ def handle_http(req):
 
 
 async def main_loop(args, hw):
-    pacman_img = PIL.Image.open('pacman_20x20_right_to_left.png')
-    pacman_phase_inc = 1
-    pacman_phase = 0
-    pacman_n_phases = pacman_img.size[0] // pacman_img.size[1]
-
     #    img = PIL.Image.open('../subway_led_panel_stm32f103/test/test_1200x20.png')
 
-    s = 'Hello NerdBerg!'
+    s = 'Hello NerdBerg, this is a test! äöpßz'
 
 #    TrueType
 #    fnt = PIL.ImageFont.truetype('arial.ttf', size=args.height)
 #    left, top, f_width, f_height = fnt.getbbox(s)
 
-#    Pixel Font, create from unifont.bdf
+
+#    Pixel Font
     unifont_pil = Path('./unifont.pil')
     if not unifont_pil.exists():
         unifont_bdf = Path('/usr/share/fonts/misc/unifont.bdf')
@@ -54,24 +64,6 @@ async def main_loop(args, hw):
     dx = 0
     while hw.running:
         await asyncio.sleep(1.0/60)  # 60 Hz
-
-        pacman_crop_rect = (
-            pacman_img.size[1] * pacman_phase,  # left
-            0,  # top
-            pacman_img.size[1] * (pacman_phase + 1),  # right
-            pacman_img.size[1],  # bottom
-        )
-        pacman_crop = pacman_img.crop(pacman_crop_rect)
-        img.paste(pacman_crop, (f_width + args.width, 0))
-
-        if pacman_phase == pacman_n_phases - 1:
-            pacman_phase_inc = -1
-        elif pacman_phase == 0:
-            pacman_phase_inc = +1
-        pacman_phase += pacman_phase_inc
-
-        info(f'{pacman_phase}/{pacman_n_phases}: delta {pacman_phase_inc}')
-
         hw.update(img.crop((dx, 0, dx+args.width, img.size[1])))
 
         dx += 1
