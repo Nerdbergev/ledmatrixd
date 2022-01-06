@@ -1,0 +1,4 @@
+*.pbm
+*.pil
+__pycache__
+*.pyc
