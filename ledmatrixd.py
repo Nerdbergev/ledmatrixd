@@ -16,23 +16,45 @@ import pygame.locals
 import hw_pygame  # dummy hw
 
 
+# given an iterable object, return
+# 0, 1, .., N-2, N-1, N-2, .. 1; repeat if endless=True
+def ping_pong_iter(it, endless=False):
+    arr = list()
+
+    while True:
+        for k in it:
+            arr.append(k)
+            yield k
+        for k in arr[-2:0:-1]:
+            yield k
+        if not endless:
+            break
+
+
+class SquareAnimation:
+    def __init__(self, fn):
+        img = PIL.Image.open(fn)  # assume N squares sz * sz
+        imgsz = img.size[1]  # width and height of a square
+        N = img.size[0] // img.size[1]  # number of squares
+
+        self.img_arr = []  # store individual tiles, cropped out
+        for j in range(N):
+            # left, top, right, bottom
+            rect = [imgsz * j, 0, imgsz*(j+1), imgsz]
+            self.img_arr.append(img.crop(rect))
+
+    def __iter__(self):
+        return ping_pong_iter(self.img_arr, True)
+
+
 def handle_http(req):
     pass
 
 
 async def main_loop(args, hw):
-    pacman_img = PIL.Image.open('pacman_20x20_right_to_left.png')
-    pacman_phase_inc = 1
-    pacman_phase = 0
-    pacman_n_phases = pacman_img.size[0] // pacman_img.size[1]
-
-    #    img = PIL.Image.open('../subway_led_panel_stm32f103/test/test_1200x20.png')
+    pacman = iter(SquareAnimation('pacman_20x20_right_to_left.png'))
 
     s = 'Hello NerdBerg!'
-
-#    TrueType
-#    fnt = PIL.ImageFont.truetype('arial.ttf', size=args.height)
-#    left, top, f_width, f_height = fnt.getbbox(s)
 
 #    Pixel Font, create from unifont.bdf
     unifont_pil = Path('./unifont.pil')
@@ -55,23 +77,7 @@ async def main_loop(args, hw):
     while hw.running:
         await asyncio.sleep(1.0/60)  # 60 Hz
 
-        pacman_crop_rect = (
-            pacman_img.size[1] * pacman_phase,  # left
-            0,  # top
-            pacman_img.size[1] * (pacman_phase + 1),  # right
-            pacman_img.size[1],  # bottom
-        )
-        pacman_crop = pacman_img.crop(pacman_crop_rect)
-        img.paste(pacman_crop, (f_width + args.width, 0))
-
-        if pacman_phase == pacman_n_phases - 1:
-            pacman_phase_inc = -1
-        elif pacman_phase == 0:
-            pacman_phase_inc = +1
-        pacman_phase += pacman_phase_inc
-
-        info(f'{pacman_phase}/{pacman_n_phases}: delta {pacman_phase_inc}')
-
+        img.paste(next(pacman), (f_width + args.width, 0))
         hw.update(img.crop((dx, 0, dx+args.width, img.size[1])))
 
         dx += 1
@@ -119,7 +125,7 @@ def main():
     except KeyboardInterrupt:
         pass
 
-    info('Cleaning up hw...')
+    info('Cleaning up hw (pygame will segfault)...')
     hw.stop()
 
 
