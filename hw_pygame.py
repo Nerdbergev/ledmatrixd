@@ -13,7 +13,8 @@ class HW_PyGame:
         self.running = True
 
         pygame.init()
-        self.window = pygame.display.set_mode((3*self.width, 3*self.height))
+        self.window = pygame.display.set_mode(
+            (3*self.width+1, 3*self.height+1))
         self.evt_consumer = loop.create_task(self._evt_consumer_coro())
 
     # stop the 'HW'
@@ -40,17 +41,17 @@ class HW_PyGame:
         if img.mode != '1':
             img = img.convert('1')
 
-        rect = pygame.Rect(0, 0, 3*self.width, 3*self.height)
-        pygame.draw.rect(self.window, (0x55, 0x55, 0x55), rect)
+        rect = pygame.Rect(0, 0, 3*self.width+1, 3*self.height+1)
+        pygame.draw.rect(self.window, (0x10, 0x10, 0x10), rect)
 
         # this is very, very inefficient
         for x in range(min(self.width, img.size[0])):
             for y in range(min(self.height, img.size[1])):
                 if img.getpixel((x, y)):
-                    col = (0xff, 0xff, 0xff)
+                    col = (0xa0, 0x90, 0x20)
                 else:
-                    col = (0, 0, 0)
-                rect = pygame.Rect(x*3, y*3, 3, 3)
+                    col = (0x30, 0x20, 0x10)
+                rect = pygame.Rect(x*3+1, y*3+1, 2, 2)
                 pygame.draw.rect(self.window, col, rect)
 
         pygame.display.flip()
