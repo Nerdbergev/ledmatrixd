@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!./venv/bin/python
 import asyncio
 import logging
 from argparse import ArgumentParser

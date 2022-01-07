@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!./venv/bin/python
 import asyncio
 from logging import critical, debug, error, info, warning
 

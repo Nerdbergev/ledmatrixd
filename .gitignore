@@ -2,3 +2,4 @@
 *.pil
 __pycache__
 *.pyc
+venv
