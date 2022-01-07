@@ -1,5 +1,6 @@
 #!./venv/bin/python
 import asyncio
+import gzip
 import json
 import logging
 from argparse import ArgumentParser
@@ -7,14 +8,12 @@ from logging import critical, debug, error, info, warning
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-import aiohttp
 import asyncio_mqtt
-import gzip
 import PIL.BdfFontFile
-import PIL.PcfFontFile
 import PIL.Image
 import PIL.ImageDraw
 import PIL.ImageFont
+import PIL.PcfFontFile
 import pygame
 import pygame.locals
 
@@ -68,7 +67,7 @@ class LedMatrix:
         self.animations = dict()
 
         self.curr_img = None
-        self.curr_anim = None # (animation iterator, x_offs, y_offs)
+        self.curr_anim = None  # (animation iterator, x_offs, y_offs)
 
     def add_animation(self, fn):
         self.animations.append(SquareAnimation(fn))
@@ -128,10 +127,6 @@ class LedMatrix:
                 dx = 0
 
 
-def handle_http(req):
-    pass
-
-
 async def mqtt_task_coro(args, matrix):
     async with asyncio_mqtt.Client(args.mqtt_host) as client:
         await client.subscribe(args.mqtt_subscribe)
@@ -171,10 +166,6 @@ def main():
     grp.add_argument('-a', '--animation', nargs='+', type=Path, metavar='png',
                      help='Add animation(s).')
 
-    grp = parser.add_argument_group('HTTP', 'Option for built in web server.')
-
-    grp.add_argument('-P', '--http-server-port', type=int, default=None)
-
     grp = parser.add_argument_group('MQTT', 'Options for MQTT communication.')
 
     grp.add_argument('-M', '--mqtt-host', type=str, metavar='hostname',
@@ -198,14 +189,6 @@ def main():
 
     hw = hw_pygame.HW_PyGame(loop, args.width, args.height)
     mx = LedMatrix(args.width, args.height, hw)
-
-    if args.http_server_port is not None:
-        app = aiohttp.web.Application()
-        app.add_routes([aiohttp.web.get('/', handle_http)])
-        runner = aiohttp.web.AppRunner(app)
-        loop.run_until_complete(runner.setup())
-        site = aiohttp.web.TCPSite(runner, '0.0.0.0', args.http_server_port)
-        loop.run_until_complete(site.start())
 
     mqtt_task = None
     if args.mqtt_host is not None:
