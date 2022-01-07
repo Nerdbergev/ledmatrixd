@@ -14,19 +14,17 @@ import PIL.Image
 import PIL.ImageDraw
 import PIL.ImageFont
 import PIL.PcfFontFile
-import pygame
-import pygame.locals
 
 import hw_pygame  # dummy hw
 
 
 # given an iterable object, return
 # 0, 1, .., N-2, N-1, N-2, .. 1; repeat if endless=True
-def ping_pong_iter(it, endless=False):
+def ping_pong_iter(src_iter, endless=False):
     arr = list()
 
     # first round, keep a copy
-    for k in it:
+    for k in src_iter:
         arr.append(k)
         yield k
 
@@ -42,13 +40,13 @@ def ping_pong_iter(it, endless=False):
 
 
 class SquareAnimation:
-    def __init__(self, fn):
-        img = PIL.Image.open(fn)  # assume N squares sz * sz
+    def __init__(self, filename):
+        img = PIL.Image.open(filename)  # assume N squares sz * sz
         self.imgsz = img.size[1]  # width and height of a square
-        N = img.size[0] // img.size[1]  # number of squares
+        n_phases = img.size[0] // img.size[1]  # number of squares
 
         self.img_arr = []  # store individual tiles, cropped out
-        for j in range(N):
+        for j in range(n_phases):
             # left, top, right, bottom
             rect = [self.imgsz * j, 0, self.imgsz*(j+1), self.imgsz]
             self.img_arr.append(img.crop(rect))
@@ -58,73 +56,87 @@ class SquareAnimation:
 
 
 class LedMatrix:
-    def __init__(self, width, height, hw):
+    def __init__(self, width, height, matrix_hw):
         self.width = width
         self.height = height
-        self.hw = hw
+        self.matrix_hw = matrix_hw
 
         self.fonts = list()
-        self.animations = dict()
+        self.animations = list()
 
         self.curr_img = None
+        self.curr_dx = 0
         self.curr_anim = None  # (animation iterator, x_offs, y_offs)
 
-    def add_animation(self, fn):
-        self.animations.append(SquareAnimation(fn))
+    def add_animation(self, filename):
+        self.animations.append(SquareAnimation(filename))
 
-    def add_font(self, fn):
-        if not isinstance(fn, Path):
-            filename = Path(fn)
+    def add_font(self, filename):
+        if not isinstance(filename, Path):
+            filename = Path(filename)
 
         font = None
-        if '.bdf' in fn.suffixes:
+        if '.bdf' in filename.suffixes:
             constr = PIL.BdfFontFile.BdfFontFile
-        elif '.pcf' in fn.suffixes:
+        elif '.pcf' in filename.suffixes:
             constr = PIL.PcfFontFile.PcfFontFile
-        elif '.pil' in fn.suffixes:
-            font = PIL.ImageFont.load(fn)
+        elif '.pil' in filename.suffixes:
+            font = PIL.ImageFont.load(filename)
         else:
-            raise RuntimeError(f'Unknown font format for {fn}.')
+            raise RuntimeError(f'Unknown font format for {filename}.')
 
         if font is None:
-            if '.gz' in fn.suffixes:
-                fp = gzip.open(fn)
+            if '.gz' in filename.suffixes:
+                reader = gzip.open(filename)
             else:
-                fp = fn.open('rb')
+                reader = filename.open('rb')
 
-            with NamedTemporaryFile('wb', suffix='.pil') as pilf:
-                ff = constr(fp)
-                ff.save(pilf.name)
-                font = PIL.ImageFont.load(pilf.name)
+            with NamedTemporaryFile('wb', suffix='.pil') as pil_font_file:
+                raw_font_file = constr(reader)
+                raw_font_file.save(pil_font_file.name)
+                font = PIL.ImageFont.load(pil_font_file.name)
 
-        info(f'Adding font {fn}.')
+        info(f'Adding font {filename}.')
         self.fonts.append(font)
 
-    async def main_loop(self):
-        pacman = SquareAnimation('pacman_20x20_right_to_left.png')
-        pacman_iter = iter(pacman)
+    def update_txt(self, s, fontnum=0):
+        fnt = self.fonts[fontnum]
+        txt_width, _ = fnt.getsize(s)
 
-        s = 'Hello NerdBerg!'
-        fnt = self.fonts[0]
-        f_width, f_height = fnt.getsize(s)
+        # option 1, <space> <text> <space>, makes sure that there
+        # is a period where the whole matrix is empty before/after text is shown
 
-        width = f_width + pacman.imgsz + 2*self.width
-        height = max(f_height, self.height)
+        img_width = txt_width + 2 * self.width - 1
+        img_height = self.height
 
-        img = PIL.Image.new(mode='L', size=(width, height))
+        img = PIL.Image.new(mode='L', size=(img_width, img_height))
         drw = PIL.ImageDraw.Draw(img)
-        drw.text((self.width, 0), s, font=fnt, fill=(0xff,))
+        drw.text((self.width, 0), s, font=fnt, fill=(0xff, ))
 
-        dx = 0
-        while self.hw.running:
+        self.curr_img = img
+        self.curr_dx = 0
+
+    async def main_loop(self):
+
+        self.update_txt('Hallo Nerdberg!')
+
+        while self.matrix_hw.running:
+            if self.curr_img is None:
+                await asyncio.sleep(1.0)
+                continue
+
             await asyncio.sleep(1.0/60)  # 60 Hz
 
-            img.paste(next(pacman_iter), (f_width + self.width, 0))
-            self.hw.update(img.crop((dx, 0, dx+self.width, img.size[1])))
+            if self.curr_anim:
+                anim_iter, anim_x, anim_y = self.curr_anim
+                self.curr_img.paste(next(anim_iter), (anim_x, anim_y))
 
-            dx += 1
-            if dx >= img.size[0] - self.width:
-                dx = 0
+            self.matrix_hw.update(self.curr_img.crop(
+                (self.curr_dx, 0, self.curr_dx+self.width, self.curr_img.size[1])))
+
+            self.curr_dx += 1
+            if self.curr_dx >= self.curr_img.size[0] - self.width:
+                self.curr_dx = 0
 
 
 async def mqtt_task_coro(args, matrix):
@@ -136,11 +148,14 @@ async def mqtt_task_coro(args, matrix):
                     info(f'MQTT message on topic {msg.topic}: {msg.payload}')
                     try:
                         obj = json.loads(msg.payload)
+                        info(f'Received json object: {repr(obj)}.')
+                        matrix.update_txt(obj['text'])
+
                     except Exception as exc:
                         err_obj = {'result': 'error', 'error': repr(exc)}
                         err_str = json.dumps(err_obj)
                         error(
-                            f'Exception {repr(exc)} while decoding json object.')
+                            f'Exception {repr(exc)} while handling command object.')
                         await client.publish(args.mqtt_publish, err_str, qos=1)
 
 
@@ -187,23 +202,22 @@ def main():
 
     loop = asyncio.new_event_loop()
 
-    hw = hw_pygame.HW_PyGame(loop, args.width, args.height)
-    mx = LedMatrix(args.width, args.height, hw)
+    matrix_hw = hw_pygame.HW_PyGame(loop, args.width, args.height)
+    led_matrix = LedMatrix(args.width, args.height, matrix_hw)
 
-    mqtt_task = None
     if args.mqtt_host is not None:
-        mqtt_task = loop.create_task(mqtt_task_coro(args, mx))
+        loop.create_task(mqtt_task_coro(args, led_matrix))
 
     if args.font:
         for fn in args.font:
-            mx.add_font(fn)
+            led_matrix.add_font(fn)
 
     if args.animation:
         for fn in args.animation:
-            mx.add_animation(fn)
+            led_matrix.add_animation(fn)
 
     try:
-        loop.run_until_complete(mx.main_loop())
+        loop.run_until_complete(led_matrix.main_loop())
         # here the mqtt_task will crash, as the loop has been closed already
         # we have to fix this later
     except KeyboardInterrupt:
