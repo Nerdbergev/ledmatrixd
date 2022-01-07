@@ -4,6 +4,7 @@ import logging
 from argparse import ArgumentParser
 from logging import critical, debug, error, info, warning
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 import aiohttp
 import PIL.Image
@@ -21,26 +22,32 @@ import hw_pygame  # dummy hw
 def ping_pong_iter(it, endless=False):
     arr = list()
 
+    # first round, keep a copy
+    for k in it:
+        arr.append(k)
+        yield k
+
     while True:
-        for k in it:
-            arr.append(k)
-            yield k
+        # reverse back
         for k in arr[-2:0:-1]:
             yield k
         if not endless:
             break
+        # forward again
+        for k in arr :
+            yield k
 
 
 class SquareAnimation:
     def __init__(self, fn):
         img = PIL.Image.open(fn)  # assume N squares sz * sz
-        imgsz = img.size[1]  # width and height of a square
+        self.imgsz = img.size[1]  # width and height of a square
         N = img.size[0] // img.size[1]  # number of squares
 
         self.img_arr = []  # store individual tiles, cropped out
         for j in range(N):
             # left, top, right, bottom
-            rect = [imgsz * j, 0, imgsz*(j+1), imgsz]
+            rect = [self.imgsz * j, 0, self.imgsz*(j+1), self.imgsz]
             self.img_arr.append(img.crop(rect))
 
     def __iter__(self):
@@ -51,38 +58,57 @@ def handle_http(req):
     pass
 
 
-async def main_loop(args, hw):
-    pacman = iter(SquareAnimation('pacman_20x20_right_to_left.png'))
+class LedMatrix :
+    def __init__(self, width, height, hw) :
+        self.width = width
+        self.height = height
+        self.hw = hw
 
-    s = 'Hello NerdBerg!'
+        self.fonts = dict()
 
-#    Pixel Font, create from unifont.bdf
-    unifont_pil = Path('./unifont.pil')
-    if not unifont_pil.exists():
-        unifont_bdf = Path('/usr/share/fonts/misc/unifont.bdf')
-        ff = PIL.BdfFontFile.BdfFontFile(unifont_bdf.open('rb'))
-        ff.save(unifont_pil)
+    def add_font(self, filename) :
+        if not isinstance(filename, Path) :
+            filename = Path(filename)
 
-    fnt = PIL.ImageFont.load(unifont_pil)
-    f_width, f_height = fnt.getsize(s)
+        name = filename.stem
+        ff = None
 
-    width = max(f_width + 2*args.width, args.width)
-    height = max(f_height, args.height)
+        if filename.suffix.lower() == '.bdf' :
+            with NamedTemporaryFile('wb', suffix='.pil') as pilf :
+                info(f'Converting BDF fontfile {filename} to pil.')
+                bdf = PIL.BdfFontFile.BdfFontFile(filename.open('rb'))
+                bdf.save(pilf.name)
+                ff = PIL.ImageFont.load(pilf.name)
 
-    img = PIL.Image.new(mode='L', size=(width, height))
-    drw = PIL.ImageDraw.Draw(img)
-    drw.text((args.width, 0), s, font=fnt, fill=(0xff,))
+        assert(ff)
+        info(f'Adding font {name}.')
+        self.fonts[name] = ff
 
-    dx = 0
-    while hw.running:
-        await asyncio.sleep(1.0/60)  # 60 Hz
+    async def main_loop(self):
+        pacman = SquareAnimation('pacman_20x20_right_to_left.png')
+        pacman_iter = iter(pacman)
 
-        img.paste(next(pacman), (f_width + args.width, 0))
-        hw.update(img.crop((dx, 0, dx+args.width, img.size[1])))
+        s = 'Hello NerdBerg!'
+        fnt = self.fonts['unifont']
+        f_width, f_height = fnt.getsize(s)
 
-        dx += 1
-        if dx >= img.size[0] - args.width:
-            dx = 0
+        width = f_width + pacman.imgsz + 2*self.width
+        height = max(f_height, self.height)
+
+        img = PIL.Image.new(mode='L', size=(width, height))
+        drw = PIL.ImageDraw.Draw(img)
+        drw.text((self.width, 0), s, font=fnt, fill=(0xff,))
+
+        dx = 0
+        while self.hw.running:
+            await asyncio.sleep(1.0/60)  # 60 Hz
+
+            img.paste(next(pacman_iter), (f_width + self.width, 0))
+            self.hw.update(img.crop((dx, 0, dx+self.width, img.size[1])))
+
+            dx += 1
+            if dx >= img.size[0] - self.width:
+                dx = 0
 
 
 def main():
@@ -119,13 +145,16 @@ def main():
 
     # hardware output
     hw = hw_pygame.HW_PyGame(loop, args.width, args.height)
+    mx = LedMatrix(args.width, args.height, hw)
+
+    mx.add_font('/usr/share/fonts/misc/unifont.bdf')
 
     try:
-        loop.run_until_complete(main_loop(args, hw))
+        loop.run_until_complete(mx.main_loop())
     except KeyboardInterrupt:
         pass
 
-    info('Cleaning up hw (pygame will segfault)...')
+    info('Cleaning up hw...')
     hw.stop()
 
 
