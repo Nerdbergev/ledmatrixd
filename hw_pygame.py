@@ -4,6 +4,7 @@ from logging import critical, debug, error, info, warning
 
 import PIL.Image
 import pygame
+import pygame.locals
 
 
 class HW_PyGame:
@@ -24,10 +25,10 @@ class HW_PyGame:
 
     async def _evt_consumer_coro(self):
         while self.running:
-            event = pygame.event.poll()
-            if event.type == pygame.locals.NOEVENT:
-                await asyncio.sleep(0.01)
+            if not pygame.event.peek():
+                await asyncio.sleep(0.1)
                 continue
+            event = pygame.event.poll()
             debug(f'pygame Event {repr(event)} received.')
             if event.type == pygame.locals.QUIT:
                 info('Window has been closed, exiting.')
