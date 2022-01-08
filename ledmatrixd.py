@@ -18,12 +18,46 @@ import PIL.PcfFontFile
 import hw_pygame  # dummy hw
 
 
+# this maxes arithmetic around the 4 tuples used for regions (boxes in PIL parlance)
+# a little easier
+class Box:
+    def __init__(self, left, top, right=None, bottom=None, width=None, height=None):
+        self.left = left
+        self.top = top
+        self.right = right if right is not None else width + left
+        self.bottom = bottom if bottom is not None else height + top
+
+    def __repr__(self):
+        return f'(#box {self.left},{self.top},{self.right},{self.bottom})'
+
+    @property
+    def width(self):
+        return self.right - self.left
+
+    @property
+    def height(self):
+        return self.bottom - self.top
+
+    @property
+    def box(self):
+        return self.left, self.top, self.right, self.bottom
+
+    @property
+    def size(self):
+        return self.right - self.left, self.bottom - self.top
+
+    @property
+    def topleft(self):
+        return self.left, self.top
+
+
 # given an iterable object, return
 # 0, 1, .., N-2, N-1, N-2, .. 1; repeat if endless=True
 def ping_pong_iter(src_iter, endless=False):
     arr = list()
 
     # first round, keep a copy
+
     for k in src_iter:
         arr.append(k)
         yield k
@@ -45,7 +79,7 @@ class SquareAnimation:
         self.imgsz = img.size[1]  # width and height of a square
         n_phases = img.size[0] // img.size[1]  # number of squares
 
-        self.img_arr = []  # store individual tiles, cropped out
+        self.img_arr = []  # store individual tiles, croped out
         for j in range(n_phases):
             # left, top, right, bottom
             rect = [self.imgsz * j, 0, self.imgsz*(j+1), self.imgsz]
@@ -55,18 +89,78 @@ class SquareAnimation:
         return ping_pong_iter(self.img_arr, True)
 
 
+class Canvas:
+    def __init__(self):
+        pass
+
+    def stamp_into(self, dst):
+        pass
+
+    def tick(self):
+        pass
+
+
+class TextScrollCanvas(Canvas):
+
+    def __init__(self, box: Box, text: str, font: PIL.ImageFont.ImageFont, dx=1.0):
+        self.box = box
+        self.update_txt(text, font, dx)
+        self.x_offs = 0.0
+        self.dx = dx
+
+        info(f'New TextScrollCanvas at {self.box}: {text}')
+
+    def update_txt(self, s, fnt, dx):
+        txt_width, _ = fnt.getsize(s)
+
+        # option 1, <space> <text> <space>, makes sure that there
+        # is a period where the whole matrix is empty before/after text is shown
+
+        img_width = txt_width + 2 * self.box.width - 1
+
+        self.img = PIL.Image.new(mode='L', size=(img_width, self.box.height))
+        drw = PIL.ImageDraw.Draw(self.img)
+        drw.text((self.box.width, 0), s, font=fnt, fill=(0xff, ))
+
+        self.x_offs = 1.0
+        self.dx = dx
+
+    def stamp_into(self, dst: PIL.Image):
+        x_offs_int = int(self.x_offs)
+
+        crop_img = self.img.crop(Box(
+            x_offs_int,
+            0,
+            width=self.box.width,
+            height=self.box.height
+        ).box)
+        dst.paste(crop_img, self.box.topleft)
+
+    def tick(self):
+        if self.dx == 0.0:
+            return
+
+        self.x_offs += self.dx
+
+        if self.dx > 0.0:
+            while self.x_offs >= self.img.size[0] - self.box.width:
+                self.x_offs -= self.img.size[0] - self.box.width
+        if self.dx < 0.0:
+            while self.x_offs < 0:
+                self.x_offs += self.img.size[0] - self.box.width
+
+
 class LedMatrix:
     def __init__(self, width, height, matrix_hw):
         self.width = width
         self.height = height
         self.matrix_hw = matrix_hw
 
-        self.fonts = list()
-        self.animations = list()
+        self.img = PIL.Image.new('L', size=(self.width, self.height))
 
-        self.curr_img = None
-        self.curr_dx = 0
-        self.curr_anim = None  # (animation iterator, x_offs, y_offs)
+        self.canvases = list()
+        self.animations = list()
+        self.fonts = list()
 
     def add_animation(self, filename):
         self.animations.append(SquareAnimation(filename))
@@ -99,44 +193,25 @@ class LedMatrix:
         info(f'Adding font {filename}.')
         self.fonts.append(font)
 
-    def update_txt(self, s, fontnum=0):
-        fnt = self.fonts[fontnum]
-        txt_width, _ = fnt.getsize(s)
-
-        # option 1, <space> <text> <space>, makes sure that there
-        # is a period where the whole matrix is empty before/after text is shown
-
-        img_width = txt_width + 2 * self.width - 1
-        img_height = self.height
-
-        img = PIL.Image.new(mode='L', size=(img_width, img_height))
-        drw = PIL.ImageDraw.Draw(img)
-        drw.text((self.width, 0), s, font=fnt, fill=(0xff, ))
-
-        self.curr_img = img
-        self.curr_dx = 0
-
     async def main_loop(self):
-
-        self.update_txt('Hallo Nerdberg!')
+        self.canvases = [
+            TextScrollCanvas(Box(0, 0, self.width, self.height),
+                             'Hallo Nerdberg!', self.fonts[0], +0.5),
+            TextScrollCanvas(Box(80, 12, width=40, height=8),
+                             'This scrolls backwards.', self.fonts[1], -0.8)
+        ]
 
         while self.matrix_hw.running:
-            if self.curr_img is None:
+            self.img.paste((0x00, ), [0, 0, self.width, self.height])
+            for canvas in self.canvases:
+                canvas.stamp_into(self.img)
+                canvas.tick()
+            self.matrix_hw.update(self.img)
+
+            if self.canvases:
+                await asyncio.sleep(1.0/60)  # 60 Hz
+            else:
                 await asyncio.sleep(1.0)
-                continue
-
-            await asyncio.sleep(1.0/60)  # 60 Hz
-
-            if self.curr_anim:
-                anim_iter, anim_x, anim_y = self.curr_anim
-                self.curr_img.paste(next(anim_iter), (anim_x, anim_y))
-
-            self.matrix_hw.update(self.curr_img.crop(
-                (self.curr_dx, 0, self.curr_dx+self.width, self.curr_img.size[1])))
-
-            self.curr_dx += 1
-            if self.curr_dx >= self.curr_img.size[0] - self.width:
-                self.curr_dx = 0
 
 
 async def mqtt_task_coro(args, matrix):
@@ -175,10 +250,10 @@ def main():
 
     grp = parser.add_argument_group('Graphics')
 
-    grp.add_argument('-f', '--font', nargs='+', type=Path, metavar='pil/bdf',
+    grp.add_argument('-f', '--font', nargs='*', type=Path, metavar='pil/bdf',
                      help='Add font file(s).')
 
-    grp.add_argument('-a', '--animation', nargs='+', type=Path, metavar='png',
+    grp.add_argument('-a', '--animation', nargs='*', type=Path, metavar='png',
                      help='Add animation(s).')
 
     grp = parser.add_argument_group('MQTT', 'Options for MQTT communication.')
