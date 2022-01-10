@@ -2,3 +2,4 @@ asyncio-mqtt==0.11.0
 paho-mqtt==1.6.1
 Pillow==9.0.0
 pygame==2.1.2
+pyusb==1.2.1
