@@ -300,6 +300,7 @@ def main():
 
     matrix_hw = hw_pygame.HW_PyGame(loop, args.width, args.height) if args.simulation else None
 
+    dev = None
     if not args.simulation:
         dev = usb.core.find(idVendor=0x4e65, idProduct=0x7264)
         if dev is None :
