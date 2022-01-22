@@ -20,11 +20,22 @@ import PIL.PcfFontFile
 # this maxes arithmetic around the 4 tuples used for regions (boxes in PIL parlance)
 # a little easier
 class Box:
-    def __init__(self, left, top, right=None, bottom=None, width=None, height=None):
+    def __init__(self, left, top, right=None, bottom=None, size=None, width=None, height=None):
         self.left = left
         self.top = top
-        self.right = right if right is not None else width + left
-        self.bottom = bottom if bottom is not None else height + top
+
+        if size is not None:
+            width, height = size
+
+        if right is None:
+            self.right = width + left
+        else:
+            self.right = right
+
+        if bottom is None:
+            self.bottom = height + top
+        else:
+            self.bottom = bottom
 
     def __repr__(self):
         return f'(#box {self.left},{self.top},{self.right},{self.bottom})'
@@ -85,6 +96,10 @@ class SquareAnimation:
             self.img_arr.append(img.crop(rect))
 
     @property
+    def size(self):
+        return self.img_arr[0].size
+
+    @property
     def width(self):
         return self.img_arr[0].size[0]
 
@@ -121,7 +136,7 @@ class TextScrollCanvas(Canvas):
         info(f'New TextScrollCanvas at {self.box}: {text}')
 
     def place_animation(self, x, y, anim):
-        self.anim_box = Box(x, y, width=anim.width, height=anim.height)
+        self.anim_box = Box(x, y, size=anim.size)
         self.anim_iter = iter(anim)
 
     def remove_animation(self):
