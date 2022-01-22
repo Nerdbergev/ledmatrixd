@@ -7,7 +7,6 @@ from argparse import ArgumentParser
 from logging import critical, debug, error, info, warning
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-import ledpanel_tools
 import sys
 
 import asyncio_mqtt
@@ -85,6 +84,14 @@ class SquareAnimation:
             rect = [self.imgsz * j, 0, self.imgsz*(j+1), self.imgsz]
             self.img_arr.append(img.crop(rect))
 
+    @property
+    def width(self) :
+        return self.img_arr[0].size[0]
+
+    @property
+    def height(self) :
+        return self.img_arr[0].size[1]
+
     def __iter__(self):
         return ping_pong_iter(self.img_arr, True)
 
@@ -108,7 +115,18 @@ class TextScrollCanvas(Canvas):
         self.x_offs = 0.0
         self.dx = dx
 
+        self.anim_box = None
+        self.anim_iter = None
+
         info(f'New TextScrollCanvas at {self.box}: {text}')
+
+    def place_animation(self, x, y, anim):
+        self.anim_box = Box(x, y, width=anim.width, height=anim.height)
+        self.anim_iter = iter(anim)
+
+    def remove_animation(self):
+        self.anim_box = None
+        self.anim_iter = None
 
     def update_txt(self, s, fnt, dx):
         txt_width, _ = fnt.getsize(s)
@@ -139,6 +157,9 @@ class TextScrollCanvas(Canvas):
     def tick(self):
         if self.dx == 0.0:
             return
+
+        if self.anim_iter:
+            self.img.paste(next(self.anim_iter), self.anim_box.box)
 
         self.x_offs += self.dx
 
@@ -200,6 +221,9 @@ class LedMatrix:
             TextScrollCanvas(Box(80, 12, width=40, height=8),
                              'This scrolls backwards.', self.fonts[1], -0.8)
         ]
+
+        anim = SquareAnimation(Path('pacman_20x20_right_to_left.png'))
+        self.canvases[0].place_animation(100, 0, anim)
 
         while self.matrix_hw.running:
             self.img.paste((0x00, ), [0, 0, self.width, self.height])
