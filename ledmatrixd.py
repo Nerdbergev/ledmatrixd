@@ -15,10 +15,12 @@ import PIL.Image
 import PIL.ImageDraw
 import PIL.ImageFont
 import PIL.PcfFontFile
-
+import datetime
 
 # this maxes arithmetic around the 4 tuples used for regions (boxes in PIL parlance)
 # a little easier
+
+
 class Box:
     def __init__(self, left, top, right=None, bottom=None, size=None, width=None, height=None):
         self.left = left
@@ -124,11 +126,12 @@ class Canvas:
 
 class TextScrollCanvas(Canvas):
 
-    def __init__(self, box: Box, text: str, font: PIL.ImageFont.ImageFont, dx=1.0):
+    def __init__(self, box: Box, text: str, font: PIL.ImageFont.ImageFont, dx=1.0, transparent=False):
         self.box = box
         self.update_txt(text, font, dx)
         self.x_offs = 0.0
         self.dx = dx
+        self.transparent = transparent
 
         self.anim_box = None
         self.anim_iter = None
@@ -167,7 +170,13 @@ class TextScrollCanvas(Canvas):
             width=self.box.width,
             height=self.box.height
         ).box)
-        dst.paste(crop_img, self.box.topleft)
+
+        if self.transparent:
+            mask = crop_img
+        else:
+            mask = None
+
+        dst.paste(crop_img, self.box.topleft, mask)
 
     def tick(self):
         if self.dx == 0.0:
@@ -230,21 +239,34 @@ class LedMatrix:
         self.fonts.append(font)
 
     async def main_loop(self):
+        td_1min = datetime.timedelta(minutes=1)
+        ts_now = datetime.datetime.now().astimezone()
+        ts_next = None
+
         self.canvases = [
             TextScrollCanvas(Box(0, 0, self.width, self.height),
                              'Hallo Nerdberg!', self.fonts[0], +0.5),
-            TextScrollCanvas(Box(80, 12, width=40, height=8),
-                             'This scrolls backwards.', self.fonts[1], -0.8)
+            None  # will be replaced by a clock
         ]
 
         anim = SquareAnimation(Path('pacman_20x20_right_to_left.png'))
         self.canvases[0].place_animation(100, 0, anim)
 
         while self.matrix_hw.running:
+
+            ts_now = datetime.datetime.now().astimezone()
+            if ts_next is None or ts_now > ts_next:
+                ts_next = ts_now.replace(microsecond=0, second=0) + td_1min
+                time_str = ts_now.strftime('%B, %d %Y, %H:%M')
+                self.canvases[1] = TextScrollCanvas(Box(80, 12, width=40, height=9),
+                                                    time_str, self.fonts[1], 0.2, True)
+
             self.img.paste((0x00, ), [0, 0, self.width, self.height])
+
             for canvas in self.canvases:
                 canvas.stamp_into(self.img)
                 canvas.tick()
+
             self.matrix_hw.update(self.img)
             if self.canvases:
                 await asyncio.sleep(1.0/60)  # 60 Hz
