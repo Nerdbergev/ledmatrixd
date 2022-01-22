@@ -1,3 +1,4 @@
+#!./venv/bin/python
 import asyncio
 import gzip
 import json
@@ -8,7 +9,6 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 import ledpanel_tools
 import sys
-import usb.core
 
 import asyncio_mqtt
 import PIL.BdfFontFile
@@ -16,8 +16,6 @@ import PIL.Image
 import PIL.ImageDraw
 import PIL.ImageFont
 import PIL.PcfFontFile
-
-import hw_pygame  # dummy hw
 
 
 # this maxes arithmetic around the 4 tuples used for regions (boxes in PIL parlance)
@@ -153,11 +151,10 @@ class TextScrollCanvas(Canvas):
 
 
 class LedMatrix:
-    def __init__(self, width, height, matrix_hw=None, dev=None):
+    def __init__(self, width, height, matrix_hw=None):
         self.width = width
         self.height = height
         self.matrix_hw = matrix_hw
-        self.dev = dev
 
         self.img = PIL.Image.new('L', size=(self.width, self.height))
 
@@ -204,35 +201,16 @@ class LedMatrix:
                              'This scrolls backwards.', self.fonts[1], -0.8)
         ]
 
-        if self.matrix_hw is not None:
-            while self.matrix_hw.running:
-                self.img.paste((0x00, ), [0, 0, self.width, self.height])
-                for canvas in self.canvases:
-                    canvas.stamp_into(self.img)
-                    canvas.tick()
-                self.matrix_hw.update(self.img)
-
-                if self.canvases:
-                    await asyncio.sleep(1.0/60)  # 60 Hz
-                else:
-                    await asyncio.sleep(1.0)
-        elif self.dev is not None:
-            print(f"Starts to send to dev")
-            while True:
-                self.img.paste((0x00, ), [0, 0, self.width, self.height])
-                for canvas in self.canvases:
-                    canvas.stamp_into(self.img)
-                    canvas.tick()
-                output = ledpanel_tools.image_to_ledpanel_bytes(self.img)
-                self.dev.write(0x01, output)
-
-
-                if self.canvases:
-                    await asyncio.sleep(1.0/60)  # 60 Hz
-                else:
-                    await asyncio.sleep(1.0)
-
-
+        while self.matrix_hw.running:
+            self.img.paste((0x00, ), [0, 0, self.width, self.height])
+            for canvas in self.canvases:
+                canvas.stamp_into(self.img)
+                canvas.tick()
+            self.matrix_hw.update(self.img)
+            if self.canvases:
+                await asyncio.sleep(1.0/60)  # 60 Hz
+            else:
+                await asyncio.sleep(1.0)
 
 async def mqtt_task_coro(args, matrix):
     async with asyncio_mqtt.Client(args.mqtt_host) as client:
@@ -267,6 +245,7 @@ def main():
                      help='LED panel width [def:%(default)d]')
     grp.add_argument('-H', '--height', type=int, default=20,
                      help='LED panel height [def:%(default)d]')
+
     grp.add_argument('-S','--simulation', action='store_true', help='Simulate with pyGame') 
 
     grp = parser.add_argument_group('Graphics')
@@ -298,21 +277,14 @@ def main():
 
     loop = asyncio.new_event_loop()
 
-    matrix_hw = hw_pygame.HW_PyGame(loop, args.width, args.height) if args.simulation else None
+    if args.simulation :
+        import hw_pygame
+        matrix_hw = hw_pygame.HW_PyGame(loop, args.width, args.height)
+    else :
+        import hw_usb
+        matrix_hw = hw_usb.HW_USB()
 
-    dev = None
-    if not args.simulation:
-        dev = usb.core.find(idVendor=0x4e65, idProduct=0x7264)
-        if dev is None :
-            print('Could not find usb device!')
-            sys.exit(1)
-
-        dev.set_configuration()
-        dev.ctrl_transfer(0x40, 0)
-
-
-
-    led_matrix = LedMatrix(args.width, args.height, matrix_hw, dev)
+    led_matrix = LedMatrix(args.width, args.height, matrix_hw)
 
     if args.mqtt_host is not None:
         loop.create_task(mqtt_task_coro(args, led_matrix))
