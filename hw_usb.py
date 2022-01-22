@@ -4,6 +4,7 @@ import ledpanel_tools
 import usb.core
 import PIL.Image
 
+
 def bitflip(v):
     v = ((v & 0xffff0000) >> 16) | ((v & 0x0000ffff) << 16)
     v = ((v & 0xff00ff00) >> 8) | ((v & 0x00ff00ff) << 8)
@@ -38,7 +39,7 @@ def image_to_ledpanel_bytes(img: PIL.Image) -> bytes:
 class HW_USB:
     def __init__(self):
         self.dev = usb.core.find(idVendor=0x4e65, idProduct=0x7264)
-        if self.dev is None :
+        if self.dev is None:
             raise FileNotFoundError()
         self.dev.set_configuration()
         self.running = True

@@ -85,11 +85,11 @@ class SquareAnimation:
             self.img_arr.append(img.crop(rect))
 
     @property
-    def width(self) :
+    def width(self):
         return self.img_arr[0].size[0]
 
     @property
-    def height(self) :
+    def height(self):
         return self.img_arr[0].size[1]
 
     def __iter__(self):
@@ -236,6 +236,7 @@ class LedMatrix:
             else:
                 await asyncio.sleep(1.0)
 
+
 async def mqtt_task_coro(args, matrix):
     async with asyncio_mqtt.Client(args.mqtt_host) as client:
         await client.subscribe(args.mqtt_subscribe)
@@ -270,7 +271,8 @@ def main():
     grp.add_argument('-H', '--height', type=int, default=20,
                      help='LED panel height [def:%(default)d]')
 
-    grp.add_argument('-S','--simulation', action='store_true', help='Simulate with pyGame') 
+    grp.add_argument('-S', '--simulation', action='store_true',
+                     help='Simulate with pyGame')
 
     grp = parser.add_argument_group('Graphics')
 
@@ -301,10 +303,10 @@ def main():
 
     loop = asyncio.new_event_loop()
 
-    if args.simulation :
+    if args.simulation:
         import hw_pygame
         matrix_hw = hw_pygame.HW_PyGame(loop, args.width, args.height)
-    else :
+    else:
         import hw_usb
         matrix_hw = hw_usb.HW_USB()
 
@@ -331,4 +333,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
