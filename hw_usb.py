@@ -1,9 +1,7 @@
 #!/usr/bin/python
 import usb.core
-import ledpanel_tools
-import usb.core
 import PIL.Image
-
+import struct
 
 def bitflip(v):
     v = ((v & 0xffff0000) >> 16) | ((v & 0x0000ffff) << 16)
@@ -50,5 +48,5 @@ class HW_USB:
 
     def update(self, img):
         self.dev.ctrl_transfer(0x40, 0)
-        output = ledpanel_tools.image_to_ledpanel_bytes(img)
+        output = image_to_ledpanel_bytes(img)
         self.dev.write(0x01, output)
