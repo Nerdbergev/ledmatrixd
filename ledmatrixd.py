@@ -286,6 +286,11 @@ async def mqtt_task_coro(args, matrix):
                         info(f'Received json object: {repr(obj)}.')
                         matrix.update_txt(obj['text'])
 
+                        if obj['command'] == 'write':
+                            canvas = TextScrollCanvas(
+                                Box(0, 0, size=matrix.size), obj['text'], matrix.fonts[0])
+                            matrix.canvases[0] = canvas
+
                     except Exception as exc:
                         err_obj = {'result': 'error', 'error': repr(exc)}
                         err_str = json.dumps(err_obj)

@@ -31,3 +31,26 @@ a python virtualenv that has pyusb installed.
 (this translates to the "-S" simulation argument of pymatrixd.)
 
 
+## MQTT
+
+MQTT Messages received as json objects in the subscribed topic:
+
+_Turn the LED sign off (currently unimplemented)_
+
+    {
+        'command': 'off'
+    }
+
+_Turn the LED sign on (currently unimplemented)_
+
+    {
+        'command': 'on'
+    }
+
+_Replace the main (in canvas #0)_
+
+    {
+        'command': 'write',
+        'text': 'string you want to replace'
+        'direction': pixels per 60th second
+    }
