@@ -13,6 +13,15 @@ https://github.com/vogelchr/subway_led_panel_stm32f103
 
 This software is still in active development as of January 2022.
 
+## Prerequisites
+
+Make the panel accessible by the user running this daemon, see for example
+the included file 99-ledpanel.rules.
+
+Have xorg-fonts-misc and the terminus font installed (Archlinux: terminux-font,
+xorg-fonts-misc).
+
+
 ## Quick start
 
 This daemon can be run in two ways:

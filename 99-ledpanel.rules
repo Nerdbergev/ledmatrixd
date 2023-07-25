@@ -1,0 +1,2 @@
+# Bus 003 Device 007: ID 4e65:7264 Christian Vogel <vogelchr@vogel.cx> https://github.com/vogelchr/subway_led_panel_stm32f103
+SUBSYSTEMS=="usb", ATTR{idVendor}=="4e65", ATTR{idProduct}=="7264", GROUP="users"
