@@ -146,8 +146,9 @@ class TextScrollCanvas(Canvas):
         self.anim_box = None
         self.anim_iter = None
 
-    def update_txt(self, s, fnt, dx):
-        txt_width, _ = fnt.getsize(s)
+    def update_txt(self, s, fnt:PIL.ImageFont.ImageFont, dx):
+        bbox = fnt.getbbox(s) # left, top, right, bottom
+        txt_width = bbox[2]- bbox[0]
 
         # option 1, <space> <text> <space>, makes sure that there
         # is a period where the whole matrix is empty before/after text is shown
