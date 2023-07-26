@@ -11,11 +11,13 @@ def bitflip(v):
     return ((v & 0xaaaaaaaa) >> 1) | ((v & 0x55555555) << 1)
 
 
-def image_to_ledpanel_bytes(img: PIL.Image) -> bytes:
+def image_to_ledpanel_bytes(img: PIL.Image, old_format=False) -> bytes:
 
     if img.mode != '1':
         img = img.convert('1')
-    bitdata = img.tobytes()
+
+    if not old_format :
+        return img.tobytes()
 
     ret = bytearray()
 
