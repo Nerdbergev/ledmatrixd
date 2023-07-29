@@ -23,22 +23,12 @@ class HTTP_Server:
         self.ledmatrix.img.save(png, format='PNG')
         return web.Response(body=png.getvalue(), content_type='image/png')
 
-    async def handle_main(self, req: web.Request):
-        return web.Response(content_type='text/html', text='''
-            <html><head><title>LEDmatrix</title></head><body>
-            <h1>LED Matrix</h1>
-            <img src="/live_view.png">
-            <form>
-                <input type="text" name="new text">
-                <input type="submit">
-            </form>
-            </body></html>
-            '''
-                            )
+    async def handle_root(self, req: web.Request) :
+        return web.FileResponse('assets/index.html')
 
     async def http_server_task(self):
         app = web.Application()
-        app.router.add_get('/', self.handle_main)
+        app.router.add_get('/', self.handle_root)
         app.router.add_get('/live_view.png', self.handle_live_view)
         runner = web.AppRunner(app)
         await runner.setup()
