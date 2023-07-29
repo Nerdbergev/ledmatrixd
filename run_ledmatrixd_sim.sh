@@ -1,8 +1,16 @@
-#!/bin/sh
-[ -d venv ] || ./gen_venv.sh
+#!/bin/bash
+# 'strict' mode
+set -euo pipefail
+IFS=$'\n\t'
 
-virtualenv ./venv
-./venv/bin/pip install pillow pygame asyncio-mqtt
+if ! [ -d ./venv ] ; then
+	virtualenv ./venv
+	./venv/bin/pip install pillow asyncio-mqtt aiohttp
+fi
+
+if ! [ -d ./venv/lib/python3.11/site-packages/pygame ] ; then
+	./venv/bin/pip install pygame
+fi
 
 exec ./venv/bin/python ledmatrixd.py \
 	-S \

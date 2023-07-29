@@ -1,7 +1,16 @@
-#!/bin/sh
+#!/bin/bash
+# 'strict' mode
+set -euo pipefail
+IFS=$'\n\t'
 
-virtualenv ./venv
-./venv/bin/pip install pillow pyusb asyncio-mqtt
+if ! [ -d ./venv ] ; then
+	virtualenv ./venv
+	./venv/bin/pip install pillow asyncio-mqtt aiohttp
+fi
+
+if ! [ -d ./venv/lib/python3.11/site-packages/usb ] ; then
+	./venv/bin/pip install pyusb
+fi
 
 exec ./ledmatrixd.py \
 	-f /usr/share/fonts/misc/ter-x20b.pcf.gz \
