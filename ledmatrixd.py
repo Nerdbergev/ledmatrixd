@@ -16,6 +16,7 @@ import PIL.ImageDraw
 import PIL.ImageFont
 import PIL.PcfFontFile
 import datetime
+from http_server import HTTP_Server
 
 # this maxes arithmetic around the 4 tuples used for regions (boxes in PIL parlance)
 # a little easier
@@ -300,6 +301,7 @@ async def mqtt_task_coro(args, matrix):
                         await client.publish(args.mqtt_publish, err_str, qos=1)
 
 
+
 def main():
     parser = ArgumentParser()
     parser.add_argument('-q', '--quiet', action='store_true',
@@ -334,6 +336,12 @@ def main():
     grp.add_argument('-p', '--mqtt-publish', type=str, metavar='topic', default='ledmatrix/result',
                      help='Topit to publish results to for results. [def: %(default)s]')
 
+    grp = parser.add_argument_group('HTTP Server', 'Option for the HTTP server.')
+    grp.add_argument('-t', '--http-server-port', type=int,
+                           help='TCP port the HTTP server listens to.')
+    grp.add_argument('-A', '--http-server-addr', type=str, default='::',
+                           help='IP address the HTTP server listens to [def:%(default)s]')
+
     args = parser.parse_args()
 
     log_lvl = logging.INFO
@@ -357,6 +365,10 @@ def main():
 
     if args.mqtt_host is not None:
         loop.create_task(mqtt_task_coro(args, led_matrix))
+
+    if args.http_server_port :
+        http_server = HTTP_Server(args, led_matrix)
+        loop.create_task(http_server.http_server_task())
 
     if args.font:
         for fn in args.font:
