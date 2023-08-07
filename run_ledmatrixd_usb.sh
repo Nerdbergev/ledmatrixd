@@ -13,6 +13,5 @@ if ! [ -d ./venv/lib/python3.11/site-packages/usb ] ; then
 fi
 
 exec ./ledmatrixd.py \
-	-f /usr/share/fonts/misc/ter-x20b.pcf.gz \
-		/usr/share/fonts/misc/5x7.pcf.gz \
+	-f ter-x20b.pcf.gz 5x7.pcf.gz \
 	-M 127.0.0.1
