@@ -240,7 +240,7 @@ class LedMatrix:
 
         self.canvases = [
             TextScrollCanvas(Box(0, 0, self.width, self.height),
-                             'Hallo Nerdberg!', self.fonts[0], +0.5),
+                             'SOCO Südost Chaos Organization on CCCamp2023!', self.fonts[0], +0.5),
             None  # will be replaced by a clock
         ]
 
