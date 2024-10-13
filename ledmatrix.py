@@ -241,8 +241,11 @@ class LedMatrix:
         self.canvases = [
             TextScrollCanvas(Box(0, 0, self.width, self.height),
                              'SOCO Südost Chaos Organization on CCCamp2023!', self.fonts[0], +0.5),
+            TextScrollCanvas(Box(0, 9, self.width-40, self.height),
+                             'Just testing, 1.. 2... 3... Hello world. Foo bar. quux.', self.fonts[1], +0.33333, transparent=True),
             None  # will be replaced by a clock
         ]
+        canvas_index_clock = 2
 
         anim = SquareAnimation(Path('pacman_20x20_right_to_left.png'))
         self.canvases[0].place_animation(100, 0, anim)
@@ -253,8 +256,8 @@ class LedMatrix:
             if ts_next is None or ts_now > ts_next:
                 ts_next = ts_now.replace(microsecond=0, second=0) + td_1min
                 time_str = ts_now.strftime('%B, %d %Y, %H:%M')
-                self.canvases[1] = TextScrollCanvas(Box(80, 12, width=40, height=9),
-                                                    time_str, self.fonts[1], 0.2, True)
+                self.canvases[canvas_index_clock] = TextScrollCanvas(Box(80, 12, width=40, height=9),
+                                                    time_str, self.fonts[2], 0.2, True)
 
             self.img.paste((0x00, ), [0, 0, self.width, self.height])
 
